@@ -4,8 +4,8 @@
    clojure.set
    clojure.walk))
 
-(defn find-restricted-symbols [problem user-input]
-  (let [restricted-symbols (set (map symbol (:restricted problem)))]
+(defn find-restricted-symbols [restricted-symbol-strings user-input]
+  (let [restricted-symbols (set (map symbol restricted-symbol-strings))]
     (->> user-input
          clojure.edn/read-string
          vector
@@ -18,12 +18,11 @@
          (clojure.set/intersection restricted-symbols)
          seq)))
 
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "(flatten (into [] [[1]]))")
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "#{:my-set-item flatten}")
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "{}")
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "{flatten []}")
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "{flatten {:my-map-key into} }")
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "{flatten {:my-map-key #{[into]}} }")
-#_(find-restricted-symbols {:restricted ["flatten" "into"]} "flatten")
-#_(find-restricted-symbols {:restricted ["max" "max-key"]} "[max \"max-key\"]")
-
+#_(find-restricted-symbols ["flatten" "into"] "(flatten (into [] [[1]]))")
+#_(find-restricted-symbols ["flatten" "into"] "#{:my-set-item flatten}")
+#_(find-restricted-symbols ["flatten" "into"] "{}")
+#_(find-restricted-symbols ["flatten" "into"] "{flatten []}")
+#_(find-restricted-symbols ["flatten" "into"] "{flatten {:my-map-key into} }")
+#_(find-restricted-symbols ["flatten" "into"] "{flatten {:my-map-key #{[into]}} }")
+#_(find-restricted-symbols ["flatten" "into"] "flatten")
+#_(find-restricted-symbols ["max" "max-key"] "[max \"max-key\"]")

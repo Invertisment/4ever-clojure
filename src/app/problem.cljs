@@ -4,10 +4,9 @@
    [app.editor :as editor]
    [app.editor-settings :as editor-settings]
    [app.modal :as modal]
-   [app.problem-restrictions :as problem-restrictions]
-   [app.sci :refer [eval-string]]
+   [app.sci]
    [app.state :as state :refer [db]]
-   [clojure.string :as str]
+   [clojure.string :as strs]
    [reagent.core :as r]))
 
 (def user-data (r/cursor db [:solutions]))
@@ -19,36 +18,17 @@
 (defn next-problem [id]
   (some #(when (> (:id %) id) %) data/problems))
 
-(defn join-human [xs]
-  (if (= 1 (count xs))
-    (first xs)
-    (str (str/join ", " (butlast xs))
-         " and "
-         (last xs))))
-#_(join-human ['a 'b 'c])
-
-(defn restricted-symbol-msg [restricted-symbols]
-  (str (if (= 1 (count restricted-symbols))
-         (str (first restricted-symbols) " is")
-         (str (join-human restricted-symbols) " are"))
-       " not allowed for this problem"))
-
 (defn check-solution [problem user-solution]
-  (let [replaced (mapv #(str/replace % "__" user-solution) (:tests problem))
-        results  (map eval-string replaced)
+  (let [replaced (mapv #(strs/replace % "__" user-solution) (:tests problem))
+        results  (mapv (partial app.sci/eval-string-w-restricted (:restricted problem)) replaced)
         passed   (count (filter true? results))
-        failed   (count (filter false? results))
-        restricted-symbols (problem-restrictions/find-restricted-symbols
-                            problem
-                            user-solution)]
-    (if restricted-symbols
-      [results (restricted-symbol-msg restricted-symbols)]
-      (do (swap! user-data assoc (:id problem) {:code   user-solution
-                                                :passed passed
-                                                :failed failed})
-          (if (or (> failed 0) (> passed 0))
-            [results nil]
-            (throw (ex-info "Evaluation error" {:stacktrace (first results)})))))))
+        failed   (count (filter (comp not true?) results))]
+    (swap! user-data assoc (:id problem) {:code   user-solution
+                                          :passed passed
+                                          :failed failed})
+    (if (or (> failed 0) (> passed 0))
+      results
+      (throw (ex-info "Evaluation error" {:stacktrace (first results)})))))
 
 (def results-style {:width "100%"
                     :display "flex"
@@ -95,7 +75,7 @@
             :border-color "darkred",
             :border-style "dashed",
             :padding "10px"}} "Special Restrictions : "
-   (str/join ", " (:restricted problem))])
+   (strs/join ", " (:restricted problem))])
 
 (defn user-code-section [id problem solution]
   (r/with-let [code (r/atom (if-let [code (:code solution "")]
@@ -113,21 +93,17 @@
                settings-modal-on-close #(reset! settings-modal-is-open false)
                solution-attempted (r/atom false)
                error-stacktrace (r/atom nil)
-               error-message (r/atom nil)
                tests (:tests problem)]
     (let [next-prob (next-problem id)
           on-run (fn []
-                   (reset! error-message nil)
                    (try
                      (let [editor-value (get-editor-value)
                            _ (reset! code editor-value)
-                           [attempts attempt-error-message] (check-solution problem editor-value)]
-                       (reset! error-message attempt-error-message)
+                           attempts (check-solution problem editor-value)]
                        (when attempts
                          (reset! results attempts)
                          (reset! solution-attempted true)
-                         (when (and (every? true? attempts)
-                                    (not error-message))
+                         (when (every? true? attempts)
                            (reset! success-modal-is-open true))))
                      (catch ExceptionInfo e
                        (reset! error-stacktrace (-> e ex-data :stacktrace)))))]
@@ -145,9 +121,6 @@
        [editor/editor @code !editor-view
         {:eval? true
          :extension-mode @editor-extension-mode}]
-       (when @error-message
-         [:span {:style {:color "#ff0000", :padding "5px"}}
-          @error-message])
        [:div {:style {:display "flex"
                       :justify-content "space-between"}}
         [:button {:on-click on-run
