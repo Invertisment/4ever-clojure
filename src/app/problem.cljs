@@ -85,7 +85,7 @@
        ^{:key i}
        [render-result-item
         test
-        (if passed?
+        (if (true? passed?)
           [result-info-item "green" "🟢 pass"]
           [result-info-item "red"   "🔴 uh-oh"])]))])
 
